@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude AI Chat — Puter.js</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f13;
+    --surface: #18181f;
+    --surface2: #111118;
+    --surface3: #1e1e2a;
+    --border: #2a2a38;
+    --text: #e8e8f0;
+    --text-muted: #555;
+    --text-dim: #333;
+    --accent: #8b5cf6;
+    --accent-glow: rgba(139,92,246,0.10);
+    --accent-light: #c4b5fd;
+    --green: #10b981;
+    --green-bg: rgba(16,185,129,0.08);
+    --red: #f43f5e;
+    --red-bg: rgba(244,63,94,0.08);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem 1rem 2rem;
+  }
+
+  .wrap { width: 100%; max-width: 700px; }
+
+  /* Header */
+  .header { text-align: center; margin-bottom: 1.5rem; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent-light); background: var(--accent-glow);
+    border: 1px solid rgba(139,92,246,0.2); padding: 4px 12px; border-radius: 100px;
+    margin-bottom: 0.75rem;
+  }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+  h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.3rem; }
+  h1 span { color: var(--accent-light); }
+  .sub { font-size: 13px; color: var(--text-muted); }
+
+  /* Model bar */
+  .model-bar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px 14px 0 0; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);
+  }
+  .lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.65rem; }
+  .model-scroller { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .model-scroller::-webkit-scrollbar { display: none; }
+  .model-pill {
+    padding: 6px 13px; border: 1px solid var(--border); border-radius: 100px;
+    font-size: 12px; font-weight: 500; color: var(--text-muted);
+    cursor: pointer; white-space: nowrap; transition: all 0.15s; flex-shrink: 0; background: transparent;
+  }
+  .model-pill:hover { border-color: rgba(139,92,246,0.4); color: var(--accent-light); background: var(--accent-glow); }
+  .model-pill.on { border-color: var(--accent); color: var(--accent-light); background: var(--accent-glow); }
+
+  /* System prompt */
+  .sys-bar {
+    background: var(--surface); border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border); padding: 0.75rem 1.25rem;
+    display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border);
+  }
+  .sys-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .sys-input {
+    flex: 1; background: transparent; border: none; outline: none;
+    font-size: 13px; color: var(--text); font-family: inherit;
+  }
+  .sys-input::placeholder { color: var(--text-dim); }
+
+  /* Chat window */
+  .chat-window {
+    background: var(--surface2); border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border); min-height: 360px; max-height: 480px;
+    overflow-y: auto; padding: 1.25rem; display: flex; flex-direction: column; gap: 14px;
+  }
+  .chat-window::-webkit-scrollbar { width: 4px; }
+  .chat-window::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Empty state */
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; padding: 2rem; gap: 12px; color: var(--text-muted);
+    min-height: 280px;
+  }
+  .empty-icon {
+    width: 52px; height: 52px; border-radius: 14px;
+    background: var(--accent-glow); border: 1px solid rgba(139,92,246,0.2);
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
+  }
+  .empty-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .empty-sub { font-size: 13px; color: var(--text-muted); line-height: 1.5; max-width: 300px; }
+  .suggestions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 4px; }
+  .sug {
+    padding: 6px 12px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 100px; font-size: 12px; color: var(--text-muted); cursor: pointer; transition: all 0.12s;
+  }
+  .sug:hover { border-color: rgba(139,92,246,0.35); color: var(--accent-light); background: var(--accent-glow); }
+
+  /* Messages */
+  .msg { display: flex; gap: 10px; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .msg.user { flex-direction: row-reverse; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; margin-top: 2px;
+  }
+  .avatar.ai { background: var(--accent-glow); border: 1px solid rgba(139,92,246,0.25); color: var(--accent-light); }
+  .avatar.user { background: var(--surface3); border: 1px solid var(--border); color: var(--text-muted); }
+  .msg-col { max-width: 82%; }
+  .bubble {
+    padding: 10px 14px; border-radius: 12px; font-size: 14px;
+    line-height: 1.7; white-space: pre-wrap; word-break: break-word;
+  }
+  .bubble.ai { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 4px 12px 12px 12px; }
+  .bubble.user { background: rgba(139,92,246,0.13); border: 1px solid rgba(139,92,246,0.25); color: var(--text); border-radius: 12px 4px 12px 12px; }
+  .bubble.streaming::after {
+    content: '▋'; display: inline-block; animation: cur 0.7s infinite;
+    color: var(--accent-light); margin-left: 2px;
+  }
+  @keyframes cur { 0%,100%{opacity:1} 50%{opacity:0} }
+  .msg-meta { font-size: 10px; color: var(--text-dim); margin-top: 4px; padding: 0 4px; }
+  .msg.user .msg-meta { text-align: right; }
+
+  /* Input bar */
+  .input-bar {
+    background: var(--surface); border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 14px 14px; padding: 1rem 1.25rem;
+  }
+  .input-row { display: flex; gap: 10px; align-items: flex-end; }
+  .msg-input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 14px; font-size: 14px; color: var(--text);
+    font-family: inherit; resize: none; outline: none; max-height: 140px; min-height: 44px;
+    line-height: 1.5; transition: border-color 0.15s;
+  }
+  .msg-input:focus { border-color: var(--accent); }
+  .msg-input::placeholder { color: var(--text-muted); }
+  .send-btn {
+    width: 44px; height: 44px; border-radius: 10px; background: var(--accent);
+    border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .send-btn:hover:not(:disabled) { background: #7c3aed; transform: translateY(-1px); }
+  .send-btn:active:not(:disabled) { transform: none; }
+  .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .spin {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: none;
+  }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  .input-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+
+  .stream-toggle { display: flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+  .tog { position: relative; width: 30px; height: 16px; flex-shrink: 0; }
+  .tog input { opacity:0; width:0; height:0; }
+  .tog-t {
+    position: absolute; inset: 0; background: var(--surface3); border: 1px solid var(--border);
+    border-radius: 100px; cursor: pointer; transition: background 0.2s;
+  }
+  .tog input:checked + .tog-t { background: var(--accent); border-color: var(--accent); }
+  .tog-th { position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+  .tog input:checked + .tog-t .tog-th { transform: translateX(14px); }
+  .tog-lbl { font-size: 11px; color: var(--text-muted); }
+
+  .action-btns { display: flex; gap: 6px; }
+  .btn-xs {
+    padding: 4px 10px; background: transparent; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 11px; color: var(--text-muted);
+    cursor: pointer; font-family: inherit; transition: all 0.1s;
+  }
+  .btn-xs:hover { border-color: #3a3a4a; color: var(--text); background: var(--surface2); }
+
+  .err-bar { display: none; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-top: 8px; background: var(--red-bg); color: var(--red); }
+
+  .footer { text-align: center; font-size: 12px; color: var(--text-dim); margin-top: 1rem; }
+  .footer a { color: var(--accent-light); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="header">
+    <div class="badge"><span class="dot"></span> Free · Unlimited · No API Key</div>
+    <h1>Claude <span>AI Chat</span></h1>
+    <p class="sub">Puter.js ke zariye — koi API key nahi chahiye</p>
+  </div>
+
+  <div class="model-bar">
+    <div class="lbl">Model chunein</div>
+    <div class="model-scroller">
+      <div class="model-pill" data-m="claude-haiku-4-5" onclick="pickModel(this)">Haiku 4.5 ⚡</div>
+      <div class="model-pill on" data-m="claude-sonnet-4-6" onclick="pickModel(this)">Sonnet 4.6 ✦</div>
+      <div class="model-pill" data-m="claude-opus-4-6" onclick="pickModel(this)">Opus 4.6</div>
+      <div class="model-pill" data-m="claude-opus-4.6-fast" onclick="pickModel(this)">Opus 4.6 Fast 🚀</div>
+      <div class="model-pill" data-m="claude-opus-4-7" onclick="pickModel(this)">Opus 4.7 👑</div>
+      <div class="model-pill" data-m="claude-sonnet-4-5" onclick="pickModel(this)">Sonnet 4.5</div>
+      <div class="model-pill" data-m="claude-3-5-sonnet" onclick="pickModel(this)">Sonnet 3.5</div>
+      <div class="model-pill" data-m="claude-3-haiku" onclick="pickModel(this)">Haiku 3</div>
+    </div>
+  </div>
+
+  <div class="sys-bar">
+    <span class="sys-label">System:</span>
+    <input class="sys-input" id="sys-prompt" type="text" placeholder="AI ka role define karein... (optional)" value="You are a helpful, smart, and friendly AI assistant.">
+  </div>
+
+  <div class="chat-window" id="chat-window">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">✦</div>
+      <div class="empty-title">Claude se baat karein</div>
+      <div class="empty-sub">Koi bhi sawaal poochein — coding, writing, analysis, math, kuch bhi!</div>
+      <div class="suggestions">
+        <div class="sug" onclick="useSug(this)">Mujhe Python sikhao</div>
+        <div class="sug" onclick="useSug(this)">Ek poem likho</div>
+        <div class="sug" onclick="useSug(this)">Quantum computing explain karo</div>
+        <div class="sug" onclick="useSug(this)">Resume tips do</div>
+        <div class="sug" onclick="useSug(this)">Business idea do</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-bar">
+    <div class="input-row">
+      <textarea class="msg-input" id="msg-input" placeholder="Message likhein... (Enter = send, Shift+Enter = new line)" rows="1" onkeydown="onKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="send()">
+        <div class="spin" id="sp"></div>
+        <svg id="send-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    <div class="input-footer">
+      <label class="stream-toggle">
+        <div class="tog">
+          <input type="checkbox" id="stream-tog" checked>
+          <div class="tog-t"><div class="tog-th"></div></div>
+        </div>
+        <span class="tog-lbl">Streaming on</span>
+      </label>
+      <div class="action-btns">
+        <button class="btn-xs" onclick="clearChat()">Clear</button>
+        <button class="btn-xs" onclick="exportChat()">Export</button>
+      </div>
+    </div>
+    <div class="err-bar" id="err-bar"></div>
+  </div>
+
+</div>
+
+<p class="footer">
+  Open at <a href="https://docs.puter.com/playground/" target="_blank">docs.puter.com/playground</a>
+  &nbsp;·&nbsp; Powered by <a href="https://developer.puter.com" target="_blank">Puter.js</a> &amp; Claude
+</p>
+
+<script src="https://js.puter.com/v2/"></script>
+<script>
+  let model = 'claude-sonnet-4-6';
+  let messages = [];
+  let busy = false;
+
+  function pickModel(el) {
+    document.querySelectorAll('.model-pill').forEach(p => p.classList.remove('on'));
+    el.classList.add('on');
+    model = el.dataset.m;
+  }
+
+  function useSug(el) {
+    const inp = document.getElementById('msg-input');
+    inp.value = el.textContent;
+    autoResize(inp);
+    send();
+  }
+
+  function onKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+  }
+
+  function showErr(msg) {
+    const el = document.getElementById('err-bar');
+    el.textContent = msg; el.style.display = 'block';
+  }
+  function hideErr() { document.getElementById('err-bar').style.display = 'none'; }
+
+  function scrollBottom() {
+    const cw = document.getElementById('chat-window');
+    cw.scrollTop = cw.scrollHeight;
+  }
+
+  function removeEmpty() {
+    const e = document.getElementById('empty-state');
+    if (e) e.remove();
+  }
+
+  function addMsg(role, text, streaming) {
+    removeEmpty();
+    const cw = document.getElementById('chat-window');
+
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + role;
+
+    const av = document.createElement('div');
+    av.className = 'avatar ' + role;
+    av.textContent = role === 'ai' ? '✦' : 'U';
+
+    const col = document.createElement('div');
+    col.className = 'msg-col';
+
+    const bub = document.createElement('div');
+    bub.className = 'bubble ' + role + (streaming ? ' streaming' : '');
+    bub.textContent = text;
+
+    const meta = document.createElement('div');
+    meta.className = 'msg-meta';
+    meta.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + ' · ' + model;
+
+    col.appendChild(bub);
+    col.appendChild(meta);
+    wrap.appendChild(av);
+    wrap.appendChild(col);
+    cw.appendChild(wrap);
+    scrollBottom();
+    return bub;
+  }
+
+  async function send() {
+    if (busy) return;
+    const input = document.getElementById('msg-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    hideErr();
+    busy = true;
+    input.value = '';
+    autoResize(input);
+    document.getElementById('send-btn').disabled = true;
+    document.getElementById('sp').style.display = 'block';
+    document.getElementById('send-icon').style.display = 'none';
+
+    messages.push({ role: 'user', content: text });
+    addMsg('user', text, false);
+
+    const sys = document.getElementById('sys-prompt').value.trim();
+    const useStream = document.getElementById('stream-tog').checked;
+    const apiMsgs = messages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }));
+
+    try {
+      let fullText = '';
+      const opts = { model };
+      if (sys) opts.system = sys;
+
+      if (useStream) {
+        opts.stream = true;
+        const bub = addMsg('ai', '', true);
+        const resp = await puter.ai.chat(apiMsgs, opts);
+        for await (const part of resp) {
+          if (part?.text) { fullText += part.text; bub.textContent = fullText; scrollBottom(); }
+        }
+        bub.classList.remove('streaming');
+      } else {
+        const bub = addMsg('ai', '...', true);
+        const resp = await puter.ai.chat(apiMsgs, opts);
+        fullText = resp?.message?.content?.[0]?.text || resp?.text || String(resp);
+        bub.textContent = fullText;
+        bub.classList.remove('streaming');
+      }
+
+      messages.push({ role: 'ai', content: fullText });
+
+    } catch(e) {
+      showErr('Error: ' + (e.message || 'Kuch galat hua. Puter Playground mein try karein.'));
+      messages.pop();
+    } finally {
+      busy = false;
+      document.getElementById('send-btn').disabled = false;
+      document.getElementById('sp').style.display = 'none';
+      document.getElementById('send-icon').style.display = 'block';
+    }
+  }
+
+  function clearChat() {
+    messages = [];
+    const cw = document.getElementById('chat-window');
+    cw.innerHTML = `<div class="empty-state" id="empty-state">
+      <div class="empty-icon">✦</div>
+      <div class="empty-title">Claude se baat karein</div>
+      <div class="empty-sub">Koi bhi sawaal poochein — coding, writing, analysis, math, kuch bhi!</div>
+      <div class="suggestions">
+        <div class="sug" onclick="useSug(this)">Mujhe Python sikhao</div>
+        <div class="sug" onclick="useSug(this)">Ek poem likho</div>
+        <div class="sug" onclick="useSug(this)">Quantum computing explain karo</div>
+        <div class="sug" onclick="useSug(this)">Resume tips do</div>
+        <div class="sug" onclick="useSug(this)">Business idea do</div>
+      </div>
+    </div>`;
+    hideErr();
+  }
+
+  function exportChat() {
+    if (!messages.length) return;
+    const txt = messages.map(m => (m.role === 'user' ? 'You' : 'Claude') + ':\n' + m.content).join('\n\n---\n\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(txt);
+    a.download = 'claude-chat-' + Date.now() + '.txt';
+    a.click();
+  }
+</script>
+</body>
+</html>
